@@ -8,9 +8,9 @@ class Game {
         this.ctx = this.canvas.getContext('2d');
         this.tileSize = 32;
 
-        // Display Setup (Virtual resolution: 960x384, scale up dynamically)
-        this.width = 960;
-        this.height = 384;
+        // Display Setup: 20 tiles wide x 10 tiles high (640x320 virtual res)
+        this.width = 640;
+        this.height = 320;
         this.canvas.width = this.width;
         this.canvas.height = this.height;
 
@@ -19,6 +19,7 @@ class Game {
         this.level = null;
         this.deaths = 0;
         this.starsCollected = 0;
+        this.keysHeld = 0;
         this.levelTimer = 0;
         this.totalTimer = 0;
         this.paused = false;
@@ -45,6 +46,7 @@ class Game {
             coyoteTimer: 0,
             jumpBuffer: 0,
             canDash: true,
+            canDoubleJump: false,
             isDashing: false,
             dashTimer: 0,
             dashDuration: 0.16,
@@ -81,7 +83,7 @@ class Game {
                 return;
             }
 
-            if (this.keys[e.code]) return; // avoid duplicate press
+            if (this.keys[e.code]) return;
             this.keys[e.code] = true;
 
             // Audio unlock
@@ -94,7 +96,7 @@ class Game {
 
             // Jump trigger with buffer
             if (e.code === 'Space' || e.code === 'KeyW' || e.code === 'ArrowUp' || e.code === 'KeyZ') {
-                this.player.jumpBuffer = 0.12;
+                this.player.jumpBuffer = 0.14;
             }
 
             // Dash trigger
@@ -150,6 +152,7 @@ class Game {
         const raw = window.RAW_LEVELS_SOURCE[index];
         this.level = window.parseAsciiLevel(raw);
         this.levelTimer = 0;
+        this.keysHeld = 0;
         this.respawnPlayer(false);
         this.updateHUD();
     }
@@ -157,6 +160,7 @@ class Game {
     loadCustomLevel(levelObj) {
         this.level = levelObj;
         this.levelTimer = 0;
+        this.keysHeld = 0;
         this.respawnPlayer(false);
         this.updateHUD();
     }
@@ -174,18 +178,26 @@ class Game {
         p.vy = 0;
         p.grounded = false;
         p.canDash = true;
+        p.canDoubleJump = false;
         p.isDashing = false;
         p.dashTimer = 0;
         p.squashX = 1;
         p.squashY = 1;
         p.isDead = false;
         p.respawnTimer = 0;
+        this.keysHeld = 0;
 
         // Reset entities
         this.level.entities.forEach(ent => {
-            if (ent.type === 'crystal') {
+            if (ent.type === 'crystal' || ent.type === 'double_jump_gem') {
                 ent.active = true;
                 ent.respawnTimer = 0;
+            }
+            if (ent.type === 'key') {
+                ent.collected = false;
+            }
+            if (ent.type === 'door') {
+                ent.unlocked = false;
             }
             if (ent.type === 'crumble') {
                 ent.state = 'solid';
@@ -234,7 +246,6 @@ class Game {
             dx = p.facing;
         }
 
-        // Normalize
         const len = Math.hypot(dx, dy);
         dx /= len;
         dy /= len;
@@ -321,7 +332,7 @@ class Game {
         p.squashX += (1 - p.squashX) * 12 * dt;
         p.squashY += (1 - p.squashY) * 12 * dt;
 
-        // Input Horizontal: support WASD, Arrow keys, and KeyQ/KeyD
+        // Input Horizontal
         let moveX = 0;
         if (this.keys['ArrowLeft'] || this.keys['KeyA']) moveX -= 1;
         if (this.keys['ArrowRight'] || this.keys['KeyD']) moveX += 1;
@@ -343,7 +354,7 @@ class Game {
             p.vx = p.dashDir.x * p.dashSpeed;
             p.vy = p.dashDir.y * p.dashSpeed;
 
-            // Spawn dash trail ghost
+            // Ghost dash trail
             this.trails.push({
                 x: p.x,
                 y: p.y,
@@ -361,12 +372,9 @@ class Game {
                 p.vy *= 0.3;
             }
         } else {
-            // Standard Horizontal Movement with snappy acceleration and responsive braking
-            const targetSpeed = moveX * p.speed;
+            // Horizontal Acceleration & Deceleration
             if (moveX !== 0) {
-                // Accelerating
                 if (Math.sign(p.vx) !== 0 && Math.sign(p.vx) !== moveX) {
-                    // Quick turn-around decel
                     p.vx += moveX * p.accel * 2.2 * dt;
                 } else {
                     p.vx += moveX * p.accel * dt;
@@ -375,7 +383,6 @@ class Game {
                     p.vx = Math.sign(p.vx) * p.speed;
                 }
             } else {
-                // Decelerating to stop
                 if (p.vx > 0) {
                     p.vx = Math.max(0, p.vx - p.decel * dt);
                 } else if (p.vx < 0) {
@@ -385,7 +392,7 @@ class Game {
 
             // Wall Sliding & Wall Jumping
             if (p.onWall !== 0 && !p.grounded && p.vy > 0) {
-                p.vy = Math.min(p.vy, 90); // gentle slide down walls
+                p.vy = Math.min(p.vy, 90);
             } else {
                 p.vy += p.gravity * dt;
                 p.vy = Math.min(p.vy, p.maxFallSpeed);
@@ -413,6 +420,16 @@ class Game {
                     p.squashY = 1.3;
                     window.soundFX.playWallJump();
                     this.createDust(p.x + (p.onWall === 1 ? p.w : 0), p.y + p.h / 2);
+                } else if (p.canDoubleJump) {
+                    // Double Jump Gem Jump
+                    p.vy = -p.jumpForce * 0.95;
+                    p.canDoubleJump = false;
+                    p.jumpBuffer = 0;
+                    p.squashX = 0.75;
+                    p.squashY = 1.3;
+                    window.soundFX.playDoubleJump();
+                    this.createDust(p.x + p.w / 2, p.y + p.h, '#22c55e');
+                    this.addFloatingText('DOUBLE JUMP!', p.x, p.y - 10, '#22c55e');
                 }
             }
         }
@@ -448,7 +465,17 @@ class Game {
                 this.killPlayer();
                 return;
             }
-            if (block.type === 'solid') {
+            if (block.type === 'solid' || block.type === 'door') {
+                if (block.type === 'door' && this.keysHeld > 0) {
+                    // Unlock door!
+                    block.entity.unlocked = true;
+                    this.keysHeld--;
+                    window.soundFX.playDoorUnlock();
+                    this.addFloatingText('UNLOCKED!', block.x + 16, block.y - 10, '#fbbf24');
+                    this.createDust(block.x + 16, block.y + 16, '#fbbf24');
+                    continue;
+                }
+
                 if (p.vx > 0) {
                     p.x = block.x - p.w;
                     p.onWall = 1;
@@ -460,7 +487,7 @@ class Game {
             }
         }
 
-        // Check wall cling if pressing into wall even without high vx
+        // Wall cling detection
         if (p.onWall === 0 && !p.grounded) {
             const leftSensor = { x: p.x - 2, y: p.y + 4, w: 2, h: p.h - 8 };
             const rightSensor = { x: p.x + p.w, y: p.y + 4, w: 2, h: p.h - 8 };
@@ -479,7 +506,16 @@ class Game {
                 this.killPlayer();
                 return;
             }
-            if (block.type === 'solid') {
+            if (block.type === 'solid' || block.type === 'door') {
+                if (block.type === 'door' && this.keysHeld > 0) {
+                    block.entity.unlocked = true;
+                    this.keysHeld--;
+                    window.soundFX.playDoorUnlock();
+                    this.addFloatingText('UNLOCKED!', block.x + 16, block.y - 10, '#fbbf24');
+                    this.createDust(block.x + 16, block.y + 16, '#fbbf24');
+                    continue;
+                }
+
                 if (p.vy > 0) {
                     p.y = block.y - p.h;
                     p.vy = 0;
@@ -500,7 +536,7 @@ class Game {
 
     hasSolidCollision(rect) {
         const collisions = this.getTileCollisions(rect);
-        return collisions.some(c => c.type === 'solid');
+        return collisions.some(c => c.type === 'solid' || c.type === 'door');
     }
 
     getTileCollisions(rect) {
@@ -515,16 +551,16 @@ class Game {
                 if (y < 0 || y >= this.level.height || x < 0 || x >= this.level.width) continue;
                 const char = this.level.grid[y][x];
 
-                if (char === '#') {
+                if (char === '#' || char === 'W') {
                     collisions.push({
                         type: 'solid',
                         x: x * this.tileSize,
                         y: y * this.tileSize,
                         w: this.tileSize,
-                        h: this.tileSize
+                        h: this.tileSize,
+                        isWallJumpable: char === 'W'
                     });
                 } else if (char === '^' || char === 'v' || char === '<' || char === '>') {
-                    // Precision hitbox for spikes (inset to feel fair)
                     let hx = x * this.tileSize;
                     let hy = y * this.tileSize;
                     let hw = this.tileSize;
@@ -542,8 +578,20 @@ class Game {
             }
         }
 
-        // Entity solid checks (Crumble & Moving Platforms)
+        // Entity solid checks
         this.level.entities.forEach(ent => {
+            if (ent.type === 'door' && !ent.unlocked) {
+                if (this.rectsOverlap(rect, ent)) {
+                    collisions.push({
+                        type: 'door',
+                        x: ent.x,
+                        y: ent.y,
+                        w: ent.w,
+                        h: ent.h,
+                        entity: ent
+                    });
+                }
+            }
             if (ent.type === 'crumble' && ent.state === 'solid') {
                 if (this.rectsOverlap(rect, ent)) {
                     collisions.push({
@@ -560,7 +608,6 @@ class Game {
                 }
             }
             if (ent.type === 'moving_plat') {
-                // One-way semi-solid platform from top
                 const prevY = rect.y - (this.player.vy * 0.02);
                 if (prevY + rect.h <= ent.y + 6 && rect.y + rect.h >= ent.y && rect.x + rect.w > ent.x && rect.x < ent.x + ent.w) {
                     if (this.player.vy >= 0) {
@@ -571,7 +618,6 @@ class Game {
                             w: ent.w,
                             h: ent.h
                         });
-                        // Carry player horizontally
                         if (ent.axis === 'x') {
                             this.player.x += ent.dir * ent.speed * 0.016;
                         }
@@ -587,7 +633,7 @@ class Game {
         const p = this.player;
 
         this.level.entities.forEach(ent => {
-            // Dash Crystal
+            // Dash Crystal (D)
             if (ent.type === 'crystal') {
                 if (!ent.active) {
                     ent.respawnTimer -= dt;
@@ -608,7 +654,40 @@ class Game {
                 }
             }
 
-            // Bounce Spring
+            // Double Jump Gem (J)
+            if (ent.type === 'double_jump_gem') {
+                if (!ent.active) {
+                    ent.respawnTimer -= dt;
+                    if (ent.respawnTimer <= 0) {
+                        ent.active = true;
+                        this.createDust(ent.x, ent.y, '#22c55e');
+                    }
+                } else {
+                    const dist = Math.hypot(p.x + p.w / 2 - ent.x, p.y + p.h / 2 - ent.y);
+                    if (dist < 20) {
+                        ent.active = false;
+                        ent.respawnTimer = 2.5;
+                        p.canDoubleJump = true;
+                        window.soundFX.playGem();
+                        this.addFloatingText('+DOUBLE JUMP', ent.x, ent.y - 10, '#22c55e');
+                        this.screenShake = 3;
+                    }
+                }
+            }
+
+            // Key Collection (K)
+            if (ent.type === 'key' && !ent.collected) {
+                const dist = Math.hypot(p.x + p.w / 2 - ent.x, p.y + p.h / 2 - ent.y);
+                if (dist < 22) {
+                    ent.collected = true;
+                    this.keysHeld++;
+                    window.soundFX.playKey();
+                    this.addFloatingText('KEY FOUND! 🗝', ent.x, ent.y - 12, '#fbbf24');
+                    this.screenShake = 4;
+                }
+            }
+
+            // Bounce Spring (B)
             if (ent.type === 'spring') {
                 ent.bounceTimer = Math.max(0, ent.bounceTimer - dt);
                 const springRect = { x: ent.x + 2, y: ent.y + 16, w: 28, h: 16 };
@@ -623,7 +702,7 @@ class Game {
                 }
             }
 
-            // Sawblade Hazard
+            // Sawblade Hazard (S)
             if (ent.type === 'saw') {
                 ent.angle += 12 * dt;
                 const dist = Math.hypot(p.x + p.w / 2 - ent.x, p.y + p.h / 2 - ent.y);
@@ -632,7 +711,7 @@ class Game {
                 }
             }
 
-            // Moving Platform
+            // Moving Platform (M / V)
             if (ent.type === 'moving_plat') {
                 if (ent.axis === 'x') {
                     ent.x += ent.dir * ent.speed * dt;
@@ -647,13 +726,13 @@ class Game {
                 }
             }
 
-            // Crumble Block
+            // Crumble Block (C)
             if (ent.type === 'crumble') {
                 if (ent.state === 'breaking') {
                     ent.timer -= dt;
                     if (ent.timer <= 0) {
                         ent.state = 'broken';
-                        ent.timer = 2.0; // respawn timer
+                        ent.timer = 2.0;
                         this.createDust(ent.x + 16, ent.y + 16, '#eab308');
                     }
                 } else if (ent.state === 'broken') {
@@ -664,7 +743,7 @@ class Game {
                 }
             }
 
-            // Secret Star
+            // Secret Star (*)
             if (ent.type === 'star' && !ent.collected) {
                 const dist = Math.hypot(p.x + p.w / 2 - ent.x, p.y + p.h / 2 - ent.y);
                 if (dist < 22) {
@@ -703,7 +782,6 @@ class Game {
     }
 
     updateParticles(dt) {
-        // Particles
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const p = this.particles[i];
             p.x += p.vx * dt;
@@ -714,7 +792,6 @@ class Game {
             }
         }
 
-        // Trails
         for (let i = this.trails.length - 1; i >= 0; i--) {
             const t = this.trails[i];
             t.life -= dt;
@@ -723,7 +800,6 @@ class Game {
             }
         }
 
-        // Floating texts
         for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
             const ft = this.floatingTexts[i];
             ft.y += ft.vy * dt;
@@ -750,7 +826,6 @@ class Game {
     render() {
         const ctx = this.ctx;
 
-        // Apply screen shake
         ctx.save();
         if (this.screenShake > 0) {
             const shakeX = (Math.random() - 0.5) * this.screenShake;
@@ -783,9 +858,20 @@ class Game {
                     ctx.fillRect(px, py, this.tileSize, this.tileSize);
                     ctx.fillStyle = '#4338ca';
                     ctx.fillRect(px + 2, py + 2, this.tileSize - 4, this.tileSize - 4);
-                    // Subtle block highlight
                     ctx.fillStyle = 'rgba(255,255,255,0.15)';
                     ctx.fillRect(px + 2, py + 2, this.tileSize - 4, 3);
+                } else if (char === 'W') {
+                    // Wall-Jumpable Striped Wall
+                    ctx.fillStyle = '#0f766e';
+                    ctx.fillRect(px, py, this.tileSize, this.tileSize);
+                    ctx.fillStyle = '#14b8a6';
+                    ctx.fillRect(px + 2, py + 2, this.tileSize - 4, this.tileSize - 4);
+                    ctx.strokeStyle = '#2dd4bf';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(px + 4, py + this.tileSize - 4);
+                    ctx.lineTo(px + this.tileSize - 4, py + 4);
+                    ctx.stroke();
                 } else if (char === '^') {
                     ctx.fillStyle = '#f43f5e';
                     ctx.beginPath();
@@ -841,6 +927,7 @@ class Game {
 
         // Draw Entities
         this.level.entities.forEach(ent => {
+            // Dash Gem (D)
             if (ent.type === 'crystal') {
                 if (ent.active) {
                     const bob = Math.sin(performance.now() * 0.005) * 3;
@@ -859,6 +946,53 @@ class Game {
                     ctx.strokeStyle = 'rgba(6, 182, 212, 0.3)';
                     ctx.strokeRect(ent.x - 6, ent.y - 6, 12, 12);
                 }
+            }
+
+            // Double Jump Gem (J)
+            if (ent.type === 'double_jump_gem') {
+                if (ent.active) {
+                    const bob = Math.sin(performance.now() * 0.006) * 3;
+                    ctx.fillStyle = '#22c55e';
+                    ctx.shadowColor = '#22c55e';
+                    ctx.shadowBlur = 8;
+                    ctx.beginPath();
+                    ctx.arc(ent.x, ent.y + bob, 8, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 9px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('J', ent.x, ent.y + bob + 3);
+                    ctx.shadowBlur = 0;
+                } else {
+                    ctx.strokeStyle = 'rgba(34, 197, 94, 0.3)';
+                    ctx.strokeRect(ent.x - 6, ent.y - 6, 12, 12);
+                }
+            }
+
+            // Key (K)
+            if (ent.type === 'key' && !ent.collected) {
+                const bob = Math.sin(performance.now() * 0.005) * 3;
+                ctx.fillStyle = '#fbbf24';
+                ctx.shadowColor = '#fbbf24';
+                ctx.shadowBlur = 6;
+                ctx.font = '18px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('🗝', ent.x, ent.y + bob);
+                ctx.shadowBlur = 0;
+            }
+
+            // Door Barrier (L)
+            if (ent.type === 'door' && !ent.unlocked) {
+                ctx.fillStyle = '#78350f';
+                ctx.fillRect(ent.x, ent.y, ent.w, ent.h);
+                ctx.strokeStyle = '#f59e0b';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(ent.x + 2, ent.y + 2, ent.w - 4, ent.h - 4);
+                ctx.fillStyle = '#fbbf24';
+                ctx.font = '14px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('🔒', ent.x + 16, ent.y + 20);
             }
 
             if (ent.type === 'spring') {
@@ -913,7 +1047,7 @@ class Game {
             if (ent.type === 'star' && !ent.collected) {
                 const bob = Math.sin(performance.now() * 0.004) * 4;
                 ctx.fillStyle = '#fbbf24';
-                ctx.font = '22px sans-serif';
+                ctx.font = '20px sans-serif';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText('⭐', ent.x, ent.y + bob);
@@ -936,22 +1070,35 @@ class Game {
             ctx.translate(cx, cy);
             ctx.scale(p.squashX, p.squashY);
 
-            // Player body
-            ctx.fillStyle = p.canDash ? '#38bdf8' : '#cbd5e1';
+            // Body color (cyan if dash ready, green if double jump ready, light gray if empty)
+            if (p.canDoubleJump) {
+                ctx.fillStyle = '#4ade80';
+            } else if (p.canDash) {
+                ctx.fillStyle = '#38bdf8';
+            } else {
+                ctx.fillStyle = '#cbd5e1';
+            }
             ctx.fillRect(-p.w / 2, -p.h, p.w, p.h);
 
-            // Player band / visor
+            // Visor
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(-p.w / 2 + (p.facing === 1 ? 4 : 0), -p.h + 5, 8, 4);
 
-            // Eye dot
+            // Eye
             ctx.fillStyle = p.canDash ? '#0284c7' : '#94a3b8';
             ctx.fillRect(-p.w / 2 + (p.facing === 1 ? 8 : 2), -p.h + 6, 3, 3);
+
+            // Key icon indicator if carrying key
+            if (this.keysHeld > 0) {
+                ctx.fillStyle = '#fbbf24';
+                ctx.font = '10px sans-serif';
+                ctx.fillText('🗝', -p.w / 2 + 2, -p.h - 2);
+            }
 
             ctx.restore();
         }
 
-        // Draw Particles
+        // Particles
         this.particles.forEach(pt => {
             const alpha = pt.life / pt.maxLife;
             ctx.fillStyle = pt.color;
@@ -960,7 +1107,7 @@ class Game {
             ctx.globalAlpha = 1;
         });
 
-        // Draw Floating Text
+        // Floating texts
         this.floatingTexts.forEach(ft => {
             const alpha = ft.life / ft.maxLife;
             ctx.fillStyle = ft.color;
@@ -975,7 +1122,7 @@ class Game {
     }
 
     gameLoop(timestamp) {
-        const dt = Math.min((timestamp - this.lastTime) / 1000, 0.05); // cap delta time
+        const dt = Math.min((timestamp - this.lastTime) / 1000, 0.05);
         this.lastTime = timestamp;
 
         this.update(dt);

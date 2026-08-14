@@ -8,24 +8,28 @@ class LevelEditor {
         this.game = game;
         this.active = false;
         this.selectedTile = '#';
-        this.width = 30;
-        this.height = 12;
+        this.width = 20;
+        this.height = 10;
         this.grid = [];
         this.isMouseDown = false;
         this.hoverTile = { x: -1, y: -1 };
 
         this.tileTypes = [
-            { id: '#', name: 'Solid Block', color: '#4f46e5', icon: '■' },
+            { id: '#', name: 'Solid Wall', color: '#4f46e5', icon: '■' },
             { id: '.', name: 'Air / Eraser', color: '#1e293b', icon: '◻' },
-            { id: 'P', name: 'Player Spawn', color: '#38bdf8', icon: '●' },
-            { id: 'G', name: 'Goal Portal', color: '#a855f7', icon: '★' },
+            { id: 'S', name: 'Player Start', color: '#38bdf8', icon: '●' },
+            { id: 'G', name: 'Goal Exit', color: '#a855f7', icon: '★' },
+            { id: 'W', name: 'Wall-Climb (W)', color: '#14b8a6', icon: '▥' },
             { id: '^', name: 'Spike Up', color: '#ef4444', icon: '▲' },
             { id: 'v', name: 'Spike Down', color: '#ef4444', icon: '▼' },
             { id: '<', name: 'Spike Left', color: '#ef4444', icon: '◀' },
             { id: '>', name: 'Spike Right', color: '#ef4444', icon: '▶' },
-            { id: 'D', name: 'Dash Crystal', color: '#06b6d4', icon: '◆' },
-            { id: 'B', name: 'Jump Pad', color: '#22c55e', icon: '⏏' },
-            { id: 'C', name: 'Crumble Block', color: '#eab308', icon: '▦' },
+            { id: 'D', name: 'Dash Crystal (D)', color: '#06b6d4', icon: '◆' },
+            { id: 'J', name: 'Double Jump (J)', color: '#22c55e', icon: '⮅' },
+            { id: 'K', name: 'Key (K)', color: '#fbbf24', icon: '🗝' },
+            { id: 'L', name: 'Locked Door (L)', color: '#d97706', icon: '🔒' },
+            { id: 'B', name: 'Jump Pad (B)', color: '#16a34a', icon: '⏏' },
+            { id: 'C', name: 'Crumble Block (C)', color: '#eab308', icon: '▦' },
             { id: 'S', name: 'Sawblade', color: '#f97316', icon: '⚙' },
             { id: 'M', name: 'Moving Platform', color: '#6366f1', icon: '↔' },
             { id: '*', name: 'Secret Star', color: '#fbbf24', icon: '⭐' }
@@ -48,7 +52,7 @@ class LevelEditor {
             }
             this.grid.push(row);
         }
-        this.grid[this.height - 2][2] = 'P';
+        this.grid[this.height - 2][2] = 'S';
         this.grid[this.height - 2][this.width - 3] = 'G';
     }
 
@@ -65,7 +69,6 @@ class LevelEditor {
 
         editorToolbar.innerHTML = '';
 
-        // Generate palette buttons
         const paletteContainer = document.createElement('div');
         paletteContainer.className = 'palette-grid';
 
@@ -84,7 +87,6 @@ class LevelEditor {
 
         editorToolbar.appendChild(paletteContainer);
 
-        // Actions (Playtest, Export, Import, Clear)
         const actionsContainer = document.createElement('div');
         actionsContainer.className = 'editor-actions';
 
@@ -92,7 +94,7 @@ class LevelEditor {
             <button id="btn-test-level" class="btn primary-btn">▶ Playtest (Tab)</button>
             <button id="btn-copy-ascii" class="btn secondary-btn">📋 Copy ASCII Code</button>
             <button id="btn-import-ascii" class="btn secondary-btn">📥 Import ASCII</button>
-            <button id="btn-clear-level" class="btn danger-btn">🗑 Clear Grid</button>
+            <button id="btn-clear-level" class="btn danger-btn">🗑 Clear Grid (20x10)</button>
         `;
 
         editorToolbar.appendChild(actionsContainer);
@@ -101,7 +103,7 @@ class LevelEditor {
         document.getElementById('btn-copy-ascii')?.addEventListener('click', () => this.exportAsciiToClipboard());
         document.getElementById('btn-import-ascii')?.addEventListener('click', () => this.showImportModal());
         document.getElementById('btn-clear-level')?.addEventListener('click', () => {
-            if (confirm('Clear canvas to empty room?')) {
+            if (confirm('Clear canvas to empty 20x10 room?')) {
                 this.initEmptyGrid();
             }
         });
@@ -115,7 +117,6 @@ class LevelEditor {
         }
 
         if (this.active) {
-            // Load current level into editor grid
             const currentRaw = window.RAW_LEVELS_SOURCE[this.game.currentLevelIndex];
             if (currentRaw) {
                 this.loadLevelIntoEditor(currentRaw);
@@ -127,7 +128,6 @@ class LevelEditor {
     }
 
     toggleTestPlay() {
-        // Compile current editor grid and load directly into game
         const raw = {
             name: "Custom Test Level",
             tip: "Testing custom creation! Press TAB to resume editing.",
@@ -145,7 +145,7 @@ class LevelEditor {
 
     exportAsciiToClipboard() {
         const ascii = this.grid.map(row => `"${row.join('')}"`).join(',\n');
-        const formatted = `{\n  name: "My Custom Level",\n  tip: "Your tip here...",\n  grid: [\n${ascii}\n  ]\n}`;
+        const formatted = `{\n  name: "My Custom Level",\n  difficulty: "Normal",\n  mechanics: ["Run", "Jump"],\n  tip: "Your tip here...",\n  grid: [\n${ascii}\n  ]\n}`;
         
         navigator.clipboard.writeText(formatted).then(() => {
             alert("Level ASCII code copied to clipboard! You can paste it into levels.js or share it!");
@@ -155,11 +155,10 @@ class LevelEditor {
     }
 
     showImportModal() {
-        const input = prompt("Paste your ASCII Level code (or raw grid lines) here:");
+        const input = prompt("Paste your ASCII Level code (or raw 20x10 grid lines) here:");
         if (!input) return;
 
         try {
-            // Check if user pasted full object or just strings
             let gridLines = [];
             if (input.includes('grid:')) {
                 const match = input.match(/grid:\s*\[([\s\S]*?)\]/);
@@ -204,11 +203,11 @@ class LevelEditor {
     setTile(tx, ty, tileChar) {
         if (tx < 0 || tx >= this.width || ty < 0 || ty >= this.height) return;
 
-        // Ensure unique Spawn (P) and Goal (G)
-        if (tileChar === 'P' || tileChar === 'G') {
+        // Ensure unique Spawn (S / P) and Goal (G)
+        if (tileChar === 'S' || tileChar === 'P' || tileChar === 'G') {
             for (let y = 0; y < this.height; y++) {
                 for (let x = 0; x < this.width; x++) {
-                    if (this.grid[y][x] === tileChar) {
+                    if (this.grid[y][x] === tileChar || (tileChar === 'S' && this.grid[y][x] === 'P')) {
                         this.grid[y][x] = '.';
                     }
                 }
@@ -223,7 +222,6 @@ class LevelEditor {
 
         const tileSize = 32;
 
-        // Render editor grid overlay
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
         ctx.lineWidth = 1;
 
@@ -253,7 +251,17 @@ class LevelEditor {
                     ctx.fillRect(px, py, tileSize, tileSize);
                     ctx.strokeStyle = '#818cf8';
                     ctx.strokeRect(px + 1, py + 1, tileSize - 2, tileSize - 2);
-                } else if (char === 'P') {
+                } else if (char === 'W') {
+                    ctx.fillStyle = '#0f766e';
+                    ctx.fillRect(px, py, tileSize, tileSize);
+                    ctx.fillStyle = '#14b8a6';
+                    ctx.fillRect(px + 2, py + 2, tileSize - 4, tileSize - 4);
+                    ctx.strokeStyle = '#2dd4bf';
+                    ctx.beginPath();
+                    ctx.moveTo(px + 4, py + tileSize - 4);
+                    ctx.lineTo(px + tileSize - 4, py + 4);
+                    ctx.stroke();
+                } else if (char === 'S' || char === 'P') {
                     ctx.fillStyle = '#38bdf8';
                     ctx.beginPath();
                     ctx.arc(px + 16, py + 16, 12, 0, Math.PI * 2);
@@ -261,7 +269,7 @@ class LevelEditor {
                     ctx.fillStyle = '#fff';
                     ctx.font = 'bold 12px monospace';
                     ctx.textAlign = 'center';
-                    ctx.fillText('P', px + 16, py + 20);
+                    ctx.fillText('S', px + 16, py + 20);
                 } else if (char === 'G') {
                     ctx.fillStyle = '#a855f7';
                     ctx.beginPath();
@@ -308,6 +316,27 @@ class LevelEditor {
                     ctx.lineTo(px + 4, py + 16);
                     ctx.closePath();
                     ctx.fill();
+                } else if (char === 'J') {
+                    ctx.fillStyle = '#22c55e';
+                    ctx.beginPath();
+                    ctx.arc(px + 16, py + 16, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 11px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('J', px + 16, py + 20);
+                } else if (char === 'K') {
+                    ctx.fillStyle = '#fbbf24';
+                    ctx.font = '18px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('🗝', px + 16, py + 22);
+                } else if (char === 'L') {
+                    ctx.fillStyle = '#78350f';
+                    ctx.fillRect(px + 2, py + 2, tileSize - 4, tileSize - 4);
+                    ctx.fillStyle = '#fbbf24';
+                    ctx.font = '14px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('🔒', px + 16, py + 22);
                 } else if (char === 'B') {
                     ctx.fillStyle = '#22c55e';
                     ctx.fillRect(px + 4, py + 20, 24, 12);
@@ -339,7 +368,6 @@ class LevelEditor {
             }
         }
 
-        // Hover cursor box
         if (this.hoverTile.x >= 0 && this.hoverTile.x < this.width &&
             this.hoverTile.y >= 0 && this.hoverTile.y < this.height) {
             ctx.strokeStyle = '#38bdf8';

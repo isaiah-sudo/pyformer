@@ -42,6 +42,27 @@ class SoundFX {
         osc.stop(now + 0.12);
     }
 
+    playDoubleJump() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(320, now);
+        osc.frequency.exponentialRampToValueAtTime(680, now + 0.14);
+
+        gain.gain.setValueAtTime(this.masterVolume * 0.45, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.14);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.14);
+    }
+
     playWallJump() {
         if (!this.enabled) return;
         this.init();
@@ -69,7 +90,7 @@ class SoundFX {
         const now = this.ctx.currentTime;
         
         // Noise buffer for whoosh sound
-        const bufferSize = this.ctx.sampleRate * 0.15;
+        const bufferSize = Math.floor(this.ctx.sampleRate * 0.15);
         const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) {
@@ -115,6 +136,51 @@ class SoundFX {
 
         osc.start(now);
         osc.stop(now + 0.08);
+    }
+
+    playKey() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const notes = [587.33, 880, 1174.66]; // D5, A5, D6
+        notes.forEach((freq, i) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            const t = now + (i * 0.06);
+
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, t);
+
+            gain.gain.setValueAtTime(this.masterVolume * 0.45, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+
+            osc.start(t);
+            osc.stop(t + 0.14);
+        });
+    }
+
+    playDoorUnlock() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(240, now);
+        osc.frequency.exponentialRampToValueAtTime(80, now + 0.2);
+
+        gain.gain.setValueAtTime(this.masterVolume * 0.4, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.2);
     }
 
     playGem() {

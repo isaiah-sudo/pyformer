@@ -38,55 +38,58 @@
             </div>
         </header>
 
-        <!-- Canvas Screen Wrapper -->
-        <div class="screen-wrapper">
-            <canvas id="game-canvas"></canvas>
+        <!-- Main Screen & Editor Side-by-Side Wrapper -->
+        <div class="main-content-area">
+            <!-- Canvas Screen Wrapper -->
+            <div class="screen-wrapper">
+                <canvas id="game-canvas"></canvas>
 
-            <!-- In-game Level Editor Panel Dock -->
+                <!-- Level Select Modal -->
+                <div id="level-select-modal" class="overlay-panel" style="display: none;">
+                    <div class="modal-content">
+                        <h2 class="modal-title">Select Level</h2>
+                        <div id="levels-list" class="level-select-grid"></div>
+                        <button id="btn-close-level-select" class="btn secondary-btn">Close</button>
+                    </div>
+                </div>
+
+                <!-- Victory Screen Modal -->
+                <div id="victory-modal" class="overlay-panel" style="display: none;">
+                    <div class="modal-content">
+                        <h2 class="modal-title">🎉 ALL LEVELS CLEARED!</h2>
+                        <p style="color: var(--text-muted); font-size: 0.9rem;">You mastered the gauntlet with pure precision reflexes.</p>
+                        
+                        <div class="modal-stats">
+                            <div class="modal-stat-box">
+                                <span class="modal-stat-val" id="final-time">0:00</span>
+                                <span class="modal-stat-lbl">FINAL TIME</span>
+                            </div>
+                            <div class="modal-stat-box">
+                                <span class="modal-stat-val" id="final-deaths">0</span>
+                                <span class="modal-stat-lbl">DEATHS</span>
+                            </div>
+                            <div class="modal-stat-box">
+                                <span class="modal-stat-val" id="final-stars">0</span>
+                                <span class="modal-stat-lbl">STARS</span>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 8px;">
+                            <button id="btn-restart-game" class="btn primary-btn">Replay</button>
+                            <button id="btn-open-editor-vic" class="btn secondary-btn">Open Level Editor</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- In-game Level Editor Panel Dock (Positioned to the Right outside the Grid Screen) -->
             <aside id="editor-panel" style="display: none;">
                 <div class="editor-header">
                     <span class="editor-title">🛠 Level Editor</span>
-                    <span style="font-size: 0.75rem; color: #94a3b8;">Click to Paint / Right-click to Erase</span>
+                    <span style="font-size: 0.75rem; color: #94a3b8;">Paint / Erase</span>
                 </div>
                 <div id="editor-toolbar"></div>
             </aside>
-
-            <!-- Level Select Modal -->
-            <div id="level-select-modal" class="overlay-panel" style="display: none;">
-                <div class="modal-content">
-                    <h2 class="modal-title">Select Level</h2>
-                    <div id="levels-list" class="level-select-grid"></div>
-                    <button id="btn-close-level-select" class="btn secondary-btn">Close</button>
-                </div>
-            </div>
-
-            <!-- Victory Screen Modal -->
-            <div id="victory-modal" class="overlay-panel" style="display: none;">
-                <div class="modal-content">
-                    <h2 class="modal-title">🎉 ALL LEVELS CLEARED!</h2>
-                    <p style="color: var(--text-muted); font-size: 0.9rem;">You mastered the gauntlet with pure precision reflexes.</p>
-                    
-                    <div class="modal-stats">
-                        <div class="modal-stat-box">
-                            <span class="modal-stat-val" id="final-time">0:00</span>
-                            <span class="modal-stat-lbl">FINAL TIME</span>
-                        </div>
-                        <div class="modal-stat-box">
-                            <span class="modal-stat-val" id="final-deaths">0</span>
-                            <span class="modal-stat-lbl">DEATHS</span>
-                        </div>
-                        <div class="modal-stat-box">
-                            <span class="modal-stat-val" id="final-stars">0</span>
-                            <span class="modal-stat-lbl">STARS</span>
-                        </div>
-                    </div>
-
-                    <div style="display: flex; gap: 8px;">
-                        <button id="btn-restart-game" class="btn primary-btn">Replay</button>
-                        <button id="btn-open-editor-vic" class="btn secondary-btn">Open Level Editor</button>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <!-- Footer / Instructions Bar -->

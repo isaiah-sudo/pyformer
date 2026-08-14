@@ -35,7 +35,7 @@ body {
     flex-direction: column;
     align-items: center;
     gap: 12px;
-    width: 960px;
+    width: 1080px;
     max-width: 98vw;
 }
 
@@ -99,11 +99,22 @@ body {
     gap: 8px;
 }
 
+/* Main Content Area & Side-by-Side Editor */
+.main-content-area {
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    gap: 16px;
+    width: 100%;
+    position: relative;
+}
+
 /* Screen Wrapper & Canvas */
 .screen-wrapper {
     position: relative;
-    width: 100%;
-    aspect-ratio: 960 / 384;
+    flex: 1;
+    min-width: 0;
+    aspect-ratio: 20 / 10;
     background: #000;
     border: 2px solid var(--surface-border);
     border-radius: 12px;
@@ -119,84 +130,20 @@ body {
     image-rendering: crisp-edges;
 }
 
-/* In-game Overlay Panels & Modals */
-.overlay-panel {
-    position: absolute;
-    inset: 0;
-    background: rgba(11, 15, 25, 0.88);
-    backdrop-filter: blur(8px);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    padding: 24px;
-    z-index: 50;
-}
-
-.modal-content {
+/* Level Editor UI Dock (External Right Sidebar) */
+#editor-panel {
+    width: 280px;
+    flex-shrink: 0;
     background: var(--surface-color);
     border: 1px solid var(--surface-border);
-    border-radius: 14px;
-    padding: 28px 36px;
-    text-align: center;
-    max-width: 440px;
+    border-radius: 12px;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 16px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
-}
-
-.modal-title {
-    font-size: 1.8rem;
-    font-weight: 800;
-    color: var(--text-main);
-}
-
-.modal-stats {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 12px;
-    width: 100%;
-    background: rgba(0,0,0,0.3);
-    padding: 12px;
-    border-radius: 8px;
-}
-
-.modal-stat-box {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-}
-
-.modal-stat-val {
-    font-family: var(--font-mono);
-    font-size: 1.2rem;
-    font-weight: 700;
-    color: var(--accent-blue);
-}
-
-.modal-stat-lbl {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-}
-
-/* Level Editor UI Dock */
-#editor-panel {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    right: 0;
-    width: 270px;
-    background: rgba(17, 24, 39, 0.95);
-    border-left: 1px solid var(--surface-border);
-    backdrop-filter: blur(6px);
-    display: flex;
-    flex-direction: column;
-    padding: 12px;
-    gap: 12px;
-    z-index: 40;
+    padding: 14px;
+    gap: 10px;
+    z-index: 10;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    max-height: 480px;
     overflow-y: auto;
 }
 
@@ -259,20 +206,24 @@ body {
 /* Level Select Grid Modal */
 .level-select-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
     margin: 12px 0;
+    max-height: 280px;
+    overflow-y: auto;
+    padding-right: 4px;
 }
 
 .level-card {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--surface-border);
     border-radius: 8px;
-    padding: 12px;
+    padding: 10px 6px;
     cursor: pointer;
     transition: all 0.2s ease;
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
+    text-align: center;
 }
 
 .level-card:hover {
