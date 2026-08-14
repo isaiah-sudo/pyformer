@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JumpPulse - Precision Platformer & Level Maker</title>
+    <meta name="description" content="A super fun, buttery-smooth precision 2D platformer with wall-jumps, air-dashes, and a live visual level editor.">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <main id="game-container">
+        <!-- Top HUD Header -->
+        <header class="game-header">
+            <div class="logo-group">
+                <h1 class="game-title">⚡ JumpPulse</h1>
+                <span class="badge" id="hud-level-name">1. First Steps</span>
+            </div>
+
+            <div class="stats-bar">
+                <div class="stat-item" title="Speedrun Timer">
+                    <span class="stat-icon">⏱</span>
+                    <span id="hud-time">0:00.0</span>
+                </div>
+                <div class="stat-item" title="Death Counter">
+                    <span class="stat-icon">💀</span>
+                    <span id="hud-deaths">0</span>
+                </div>
+                <div class="stat-item" title="Secret Stars">
+                    <span class="stat-icon">⭐</span>
+                    <span id="hud-stars">0</span>
+                </div>
+            </div>
+
+            <div class="header-controls">
+                <button id="btn-level-select" class="btn secondary-btn" title="Select Level">🗺 Levels</button>
+                <button id="btn-editor-toggle" class="btn secondary-btn" title="Toggle Level Editor (TAB)">✏ Edit (TAB)</button>
+                <button id="btn-sound-toggle" class="btn secondary-btn icon-btn" title="Toggle Sound">🔊</button>
+            </div>
+        </header>
+
+        <!-- Canvas Screen Wrapper -->
+        <div class="screen-wrapper">
+            <canvas id="game-canvas"></canvas>
+
+            <!-- In-game Level Editor Panel Dock -->
+            <aside id="editor-panel" style="display: none;">
+                <div class="editor-header">
+                    <span class="editor-title">🛠 Level Editor</span>
+                    <span style="font-size: 0.75rem; color: #94a3b8;">Click to Paint / Right-click to Erase</span>
+                </div>
+                <div id="editor-toolbar"></div>
+            </aside>
+
+            <!-- Level Select Modal -->
+            <div id="level-select-modal" class="overlay-panel" style="display: none;">
+                <div class="modal-content">
+                    <h2 class="modal-title">Select Level</h2>
+                    <div id="levels-list" class="level-select-grid"></div>
+                    <button id="btn-close-level-select" class="btn secondary-btn">Close</button>
+                </div>
+            </div>
+
+            <!-- Victory Screen Modal -->
+            <div id="victory-modal" class="overlay-panel" style="display: none;">
+                <div class="modal-content">
+                    <h2 class="modal-title">🎉 ALL LEVELS CLEARED!</h2>
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">You mastered the gauntlet with pure precision reflexes.</p>
+                    
+                    <div class="modal-stats">
+                        <div class="modal-stat-box">
+                            <span class="modal-stat-val" id="final-time">0:00</span>
+                            <span class="modal-stat-lbl">FINAL TIME</span>
+                        </div>
+                        <div class="modal-stat-box">
+                            <span class="modal-stat-val" id="final-deaths">0</span>
+                            <span class="modal-stat-lbl">DEATHS</span>
+                        </div>
+                        <div class="modal-stat-box">
+                            <span class="modal-stat-val" id="final-stars">0</span>
+                            <span class="modal-stat-lbl">STARS</span>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 8px;">
+                        <button id="btn-restart-game" class="btn primary-btn">Replay</button>
+                        <button id="btn-open-editor-vic" class="btn secondary-btn">Open Level Editor</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer / Instructions Bar -->
+        <footer class="game-footer">
+            <div class="controls-hint">
+                <span><span class="key">A / D</span> or <span class="key">← →</span> Move</span>
+                <span><span class="key">SPACE / W</span> Jump / Wall Jump</span>
+                <span><span class="key">SHIFT / X</span> Dash</span>
+                <span><span class="key">R</span> Instant Retry</span>
+                <span><span class="key">TAB</span> Level Editor</span>
+            </div>
+            <div id="hud-level-tip" style="color: var(--accent-blue); font-weight: 500;"></div>
+        </footer>
+    </main>
+
+    <!-- Scripts -->
+    <script src="audio.js"></script>
+    <script src="levels.js"></script>
+    <script src="editor.js"></script>
+    <script src="game.js"></script>
+    <script>
+        // Wire UI dialogs and toggles
+        document.getElementById('btn-sound-toggle').addEventListener('click', (e) => {
+            const enabled = window.soundFX.toggleMute();
+            e.target.innerText = enabled ? '🔊' : '🔇';
+        });
+
+        document.getElementById('btn-editor-toggle').addEventListener('click', () => {
+            window.game.editor.toggleEditor();
+        });
+
+        const levelSelectModal = document.getElementById('level-select-modal');
+        document.getElementById('btn-level-select').addEventListener('click', () => {
+            const list = document.getElementById('levels-list');
+            list.innerHTML = '';
+            window.GAME_LEVELS.forEach((lvl, idx) => {
+                const card = document.createElement('button');
+                card.className = 'level-card';
+                card.innerText = `${idx + 1}. ${lvl.name.split('. ')[1] || lvl.name}`;
+                card.onclick = () => {
+                    window.game.loadLevel(idx);
+                    levelSelectModal.style.display = 'none';
+                };
+                list.appendChild(card);
+            });
+            levelSelectModal.style.display = 'flex';
+        });
+
+        document.getElementById('btn-close-level-select').addEventListener('click', () => {
+            levelSelectModal.style.display = 'none';
+        });
+
+        document.getElementById('btn-restart-game').addEventListener('click', () => {
+            document.getElementById('victory-modal').style.display = 'none';
+            window.game.deaths = 0;
+            window.game.starsCollected = 0;
+            window.game.totalTimer = 0;
+            window.game.loadLevel(0);
+        });
+
+        document.getElementById('btn-open-editor-vic').addEventListener('click', () => {
+            document.getElementById('victory-modal').style.display = 'none';
+            window.game.editor.toggleEditor();
+        });
+    </script>
+</body>
+</html>
